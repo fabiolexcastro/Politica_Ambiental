@@ -92,8 +92,8 @@ count_area_forest(x = frs, y = 'Cobertura boscosa')
 # Count loss forest area =--------------------------------------------------
 count_yearly <- function(x, y){
   
-  x <- lss
-  y <- 'Perdida bosque'
+  # x <- gan
+  # y <- 'Perdida bosque'
   
   pnt <- rasterToPoints(x)
   pnt <- as.data.frame(pnt)
@@ -115,6 +115,7 @@ count_yearly <- function(x, y){
   pnt <- pnt %>% group_by(vereda, year) %>% dplyr::summarise(count = n()) %>% ungroup()
   pnt <- pnt %>% mutate(mts = count * pix)
   pnt <- pnt %>% mutate(has = mts / 10000)
+  pnt <- pnt %>% mutate(vereda = iconv(vereda, from = 'UTF-8', to = 'latin1'))
   
   # To make the graph
   gg <- ggplot(data = pnt, aes(x = year, y = has, group = 1)) +
@@ -127,11 +128,82 @@ count_yearly <- function(x, y){
   ggsave(plot = gg, filename = paste0('../png/graphs/', y, '.png'), units = 'in',
          width = 11, height = 13, dpi = 300)
   write.csv(pnt, '../tbl/forest/Perdida_bosque_anual.csv', row.names = FALSE)
+  
+  smm <- pnt %>% 
+    group_by(vereda) %>% 
+    dplyr::summarise(has = sum(has)) %>% 
+    ungroup() %>% 
+    arrange(desc(has))
+  smm <- smm %>% 
+    mutate(vereda = factor(vereda, levels = smm$vereda))
+  sum(smm$has)
+  write.csv(smm, '../tbl/forest/Perdida_bosque_anual_acumulada.csv', row.names = FALSE)
+  
+  # 2222.455 Has perdidas de bosque en el total del periodo
+  
+  gg_cum <- ggplot(data = smm, aes(x = vereda, y = has)) +
+    geom_col() +
+    ggtitle('Pérdida acumulada de bosque entre el 2000 - 2019') +
+    theme(axis.text.x = element_text(angle = 90),
+          plot.title = element_text(size = 14, hjust = 0.5, face = 'bold')) +
+    scale_y_continuous(expand = c(0,1)) +
+    labs(x = '',
+         y = 'Hectáreas',
+         caption = 'Adaptado de Hansen et al., 2014')
+  ggsave(plot = gg_cum,
+         filename = '../png/graphs/Perdida bosque acumulada.png',
+         units = 'in',
+         width = 14, 
+         height = 10,
+         dpi = 300)
 
+} 
+
+# Conteo area ganada ------------------------------------------------------
+count_gain <- function(x, y){
   
+  # x <- gan
+  # y <- 'Perdida bosque'
   
+  pnt <- rasterToPoints(x)
+  pnt <- as.data.frame(pnt)
+  pnt <- as_tibble(pnt)
+  pnt <- setNames(pnt, c('x', 'y', 'value'))
+  pnt <- pnt %>% filter(value == 1)
   
- } 
+  pix <- res(x)[1] * res(x)[2]
+  vls <- raster::extract(vrd, pnt[,1:2])
+  vls <- vls[,'NOMBRE_VER']
+  pnt <- pnt %>% mutate(vereda = vls)
+  pnt <- pnt %>% mutate(vereda = iconv(vereda, from = 'UTF-8', to = 'latin1'))
+  smm <- pnt %>% group_by(vereda) %>% dplyr::summarise(count = n()) %>% ungroup()
+  smm <- smm %>% mutate(mts = count * pix)
+  smm <- smm %>% mutate(has = mts / 10000)
+  smm <- drop_na(smm)
+  smm <- smm %>% arrange(desc(has))
+  smm <- smm %>% mutate(vereda = factor(vereda, levels = smm$vereda))
+  
+  # Ganancia de bosque en 20 anios, 19.7 has
+  gg <- ggplot(data = smm, aes(x = vereda, y = has)) +
+    geom_col() +
+    ggtitle('Ganancia acumulada de bosque entre el 2000 - 2019') +
+    theme(axis.text.x = element_text(angle = 90),
+          plot.title = element_text(size = 14, hjust = 0.5, face = 'bold')) +
+    scale_y_continuous(expand = c(0,0)) +
+    labs(x = '',
+         y = 'Hectáreas',
+         caption = 'Adaptado de Hansen et al., 2014')
+  
+  ggsave(plot = gg,
+         filename = '../png/graphs/Ganancia bosque acumulada.png',
+         units = 'in',
+         width = 14, 
+         height = 10,
+         dpi = 300)
+  
+  write.csv(smm, '../tbl/forest/Ganancia_bosque_acumulada.csv', row.names = FALSE)
+  
+}
 
 
 
