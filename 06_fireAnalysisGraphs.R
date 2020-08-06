@@ -33,6 +33,10 @@ fire <- st_transform(x = fire, crs = st_crs(4326))
 
 # Counting the fire points per each town ----------------------------------
 fire <- st_intersection(x = fire, y = vrds)
+st_write(obj = fire,
+         dsn = '../shp/fire/mpio', 
+         layer = 'fire_points',
+         driver = 'ESRI Shapefile')
 fire_cnt <- fire %>% 
   as.data.frame %>% 
   dplyr::select(-geometry) %>% 
