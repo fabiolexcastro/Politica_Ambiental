@@ -45,7 +45,6 @@ lss_hot <- drop_na(lss)
 3119 * 900 / 10000 # 280 has de deforestacion podrian estar asociadas a incendios
 
 # To make the map ---------------------------------------------------------
-
 gg_map <- ggplot() +
   geom_sf(data = st_as_sf(vrd), fill = NA) +
   geom_point(data = lss_hot, aes(x = lon, y = lat), color = 'red') +
@@ -61,8 +60,31 @@ ggsave(plot = gg_map,
 
 # Nota
 # Revisar la cantidad de incendios asociados a deforestacion por vereda, sacar el count
-# 
 
+smm_fire <- raster::extract(vrd, lss_hot[,2:3]) %>% 
+  pull(NOMBRE_VER) %>% 
+  table() %>% 
+  as.data.frame() %>% 
+  setNames(c('Vereda', 'Frecuencia')) %>% 
+  mutate(Vereda = iconv(Vereda, from = 'UTF-8', to = 'latin1')) %>% 
+  arrange(desc(Frecuencia)) %>% 
+  mutate(Has = Frecuencia * 900 / 10000,
+         Has = round(Has, 1),
+         Porcentaje = Has / sum(Has) * 100,
+         Porcentaje = round(Porcentaje, 1))
 
+write.csv(smm_fire, '../tbl/hotspots/count_incendios_deforestation.csv', row.names = FALSE)  
 
+top_smm_fire <- smm_fire %>% 
+  top_n(n = 10, wt = Porcentaje) %>% 
+  mutate(Vereda = factor(Vereda, levels = pull(., 1)))
 
+gg_top <- ggplot(data = top_smm_fire, aes(x = Vereda, y = Porcentaje)) + 
+  geom_col() +
+  labs(x = 'Vereda', y = 'Porcentaje (%)') +
+  scale_y_continuous(limits = c(0, 100)) +
+  ggtitle(label = 'Participación de cantidad de puntos de calor que\nestiman deforestación en las veredas de Monterrey') +
+  theme(plot.title = element_text(size = 16, face = 'bold', hjust = 0.5))
+ggsave(plot = gg_top, 
+       filename = '../png/graphs/top10_puntoscalor_deforestation.png', 
+       units = 'in', width = 12, height = 9, dpi = 300)
