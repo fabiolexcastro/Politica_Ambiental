@@ -52,6 +52,8 @@ rsl <- projectRaster(rsl, crs = prj)
 rsl <- rsl * 0 + 1
 frs <- rsl
 
+lim_prj <- spTransform(x = lim, CRSobj = prj)
+
 # Cover layer
 cov <- shapefile('../shp/cobertura/cobertura_monterrey.shp')
 
@@ -70,10 +72,10 @@ compareCRS(x = cov, y = rsl)
 
 cov_lyr <- rasterize(x = cov, y = frs, field = 'gid')
 write.csv(cov_tbl, '../tbl/cobertura/leyenda_cobertura.csv', row.names = FALSE)
-writeRaster(cov_lyr, '../tif/cover/coverlayer_2010.tif')
+writeRaster(cov_lyr, '../tif/cover/coverlayer_2010.tif', overwrite = TRUE)
 
 rsl <- cov_lyr * frs
-writeRaster(rsl, '../tif/cover/coverlayer_forest_2010.tif')
+writeRaster(rsl, '../tif/cover/coverlayer_forest_2010.tif', overwrite = TRUE)
 res <- res(rsl)[1] * res(rsl)[1]
 
 rsl_has <- data.frame(table(rsl[])) %>% 
@@ -86,18 +88,10 @@ rsl_has <- data.frame(table(rsl[])) %>%
          porc = round(porc, 1)) %>% 
   dplyr::select(gid, Cobertura, hectares, porc) %>% 
   arrange(desc(porc))
-rsl_has <- rsl_has %>% filter(porc > 0.3)
 
 write.csv(rsl_has, '../tbl/cobertura/leyenda_cobertura_filter.csv', row.names = FALSE)
 
 rsl_has <- read_csv('../tbl/cobertura/leyenda_cobertura_filter.csv')
-rsl_ha2 <- rsl_has %>% 
-  group_by(Cobertura_RCL) %>% 
-  summarize(hectares = sum(hectares)) %>% 
-  ungroup() %>% 
-  mutate(porc = hectares / sum(hectares) * 100) %>% 
-  arrange(desc(porc))
-
 
 # Perimeter
 perim <- lsm_p_perim(rsl)
@@ -107,12 +101,69 @@ areas <- lsm_p_area(rsl)
 bld_blck <- get_patches(rsl)
 bld_bnds <- get_boundaries(rsl)[[1]]
 
+rsl_has %>% filter(gid %in% c(4, 12, 17)) # Plantacion forestal y tejido urbano continuo
+
+# Calculate landscape metrics
+abb <- lsm_abbreviations_names
+lsm <- calculate_lsm(rsl, level = 'patch')
+lsm %>% distinct(metric) %>% inner_join(., abb, by = 'metric')
+unique(lsm$metric)
+
+pd <- calculate_lsm(rsl, metric = 'pd')
+
+# Metrica: CA (Area total) Unidades en ha ---------------------------------
+ca <- lsm %>% 
+  filter(metric == 'area') %>% 
+  group_by(class) %>% 
+  dplyr::summarise(value = sum(value, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  inner_join(., cov_tbl[,c(1, 2)], by = c('class' = 'gid')) %>% 
+  mutate(type_1 = str_sub(type_1, 2, nchar(type_1))) %>% 
+  dplyr::select(class, cobertura = type_1, has = value) %>% 
+  arrange(desc(has)) %>% 
+  mutate(porc = has / sum(has) * 100)
+
+# Numero de parches -------------------------------------------------------
+nc <- lsm %>% 
+  filter(metric == 'ncore') %>%
+  group_by(class) %>% 
+  dplyr::summarise(value = sum(value, na.rm = TRUE)) %>% 
+  ungroup() %>%
+  inner_join(., cov_tbl[,c(1, 2)], by = c('class' = 'gid')) %>% 
+  mutate(type_1 = str_sub(type_1, 2, nchar(type_1))) %>% 
+  dplyr::select(class, cobertura = type_1, has = value) %>% 
+  arrange(desc(has)) %>% 
+  mutate(porc = has / sum(has) * 100)
+
+# Densidad de parches -----------------------------------------------------
+pd <- lsm_c_pd(rsl) %>% 
+  inner_join(., cov_tbl[,c(1, 2)], by = c('class' = 'gid')) %>% 
+  mutate(type_1 = str_sub(type_1, 2, nchar(type_1))) %>% 
+  arrange(desc(value)) 
+
+# Indice de parche mas largo ----------------------------------------------
+lpi <- lsm_c_lpi(rsl) %>% 
+  inner_join(., cov_tbl[,c(1, 2)], by = c('class' = 'gid')) %>% 
+  mutate(type_1 = str_sub(type_1, 2, nchar(type_1))) %>% 
+  arrange(desc(value))
+
+# Indice de agregacion ----------------------------------------------------
+ai <- lsm_c_ai(rsl) %>% 
+  inner_join(., cov_tbl[,c(1, 2)], by = c('class' = 'gid')) %>% 
+  mutate(type_1 = str_sub(type_1, 2, nchar(type_1))) %>% 
+  arrange(desc(value))
+
+
+
+# Categories --------------------------------------------------------------
 cat_01 <- bld_blck$`1`
 cat_01 <- rasterToPolygons(cat_01)
 shapefile(cat_01, '../shp/cover_forest/2010/category_01.shp')
 
 # Enn landscape metrics
 lsm_enn <- rsl %>% lsm_p_enn(., directions = 8)
+
+
 
 lsm_enn %>% filter(class == 1)
 
