@@ -84,6 +84,7 @@ my_fasterize <- function(shp){
 # Load data ---------------------------------------------------------------
 lim <- shapefile('../shp/base/veredas_mas_monterrey.shp')
 thr <- readRDS('../rds/threshold_forest_hansen.rds')
+prj <- '+proj=tmerc +lat_0=4.596200416666666 +lon_0=-74.07750791666666 +k=1 +x_0=1000000 +y_0=1000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 
 # Forest processing -------------------------------------------------------
 # Cover layers
@@ -152,15 +153,62 @@ cov_00 <- shapefile('../shp/cobertura/monterrey/all/coberturas_2000.shp') %>% sp
 cov_05 <- shapefile('../shp/cobertura/monterrey/all/coberturas_2005.shp') %>% spTransform(., CRSobj = crs(frs_10_shp))
 cov_10 <- shapefile('../shp/cobertura/monterrey/all/coberturas_2010.shp') %>% spTransform(., CRSobj = crs(frs_10_shp))
 
+# Project forest shapefiles
+frs_00_shp_prj <- spTransform(x = frs_00_shp, CRSobj = prj)
+frs_05_shp_prj <- spTransform(x = frs_05_shp, CRSobj = prj)
+frs_10_shp_prj <- spTransform(x = frs_10_shp, CRSobj = prj)
+
+area(frs_00_shp_prj) / 10000
+area(frs_05_shp_prj) / 10000
+area(frs_10_shp_prj) / 10000
+
 # Cutting cover vs forest
 cov_00 <- raster::crop(cov_00, frs_00_shp) 
 cov_05 <- raster::crop(cov_05, frs_05_shp) 
 cov_10 <- raster::crop(cov_10, frs_10_shp) 
 
+rcl <- read_csv("../tbl/cobertura/cobertura_area_00_05_10.csv")
+
 dir.create('../shp/cobertura/monterrey/forest')
 shapefile(cov_00, '../shp/cobertura/monterrey/forest/coberturas_2000.shp')
 shapefile(cov_05, '../shp/cobertura/monterrey/forest/coberturas_2005.shp')
 shapefile(cov_10, '../shp/cobertura/monterrey/forest/coberturas_2010.shp')
+
+cov_00 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2000_forest.shp')
+cov_05 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2005_forest.shp')
+cov_10 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2010_forest.shp')
+
+# Reclassify and dissolve into the ArcGIS 10.x
+cov_00 %>% as.data.frame %>% distinct(LEYENDA3N)
+cov_05 %>% as.data.frame %>% distinct(LEYENDA3N)
+cov_10 %>% as.data.frame %>% distinct(LEYENDA3N)
+
+cov_00 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2000_forest_rcl.shp') %>% 
+  spTransform(., CRSobj = crs(msk)) %>% 
+  st_as_sf() %>% 
+  drop_na()
+cov_05 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2005_forest_rcl.shp') %>% 
+  spTransform(., CRSobj = crs(msk)) %>% 
+  st_as_sf() %>% 
+  drop_na()
+cov_10 <- shapefile('../shp/cobertura/monterrey/forest/coberturas_2010_forest_rcl.shp') %>% 
+  spTransform(., CRSobj = crs(msk)) %>% 
+  st_as_sf() %>% 
+  drop_na()
+
+lbl <- data.frame(gid = 1:7, name = unique(cov_05$cobertura_))
+cov_00 <- inner_join(cov_00, lbl, by = c('cobertura_' = 'name'))
+cov_05 <- inner_join(cov_05, lbl, by = c('cobertura_' = 'name'))
+cov_10 <- inner_join(cov_10, lbl, by = c('cobertura_' = 'name'))
+
+# Rasterize
+cov_00_rst <- rasterize(cov_00, msk, field = 'gid')
+cov_05_rst <- rasterize(cov_05, msk, field = 'gid')
+cov_10_rst <- rasterize(cov_10, msk, field = 'gid')
+
+writeRaster(cov_00_rst, '../tif/cover/cov_frs_00_rcl.tif')
+writeRaster(cov_05_rst, '../tif/cover/cov_frs_05_rcl.tif')
+writeRaster(cov_10_rst, '../tif/cover/cov_frs_10_rcl.tif')
 
 # Less cover representation filter -----------------------------------------
 cov_00_tbl <- filter_cover(shp = cov_00)
