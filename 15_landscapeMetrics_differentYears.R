@@ -1,5 +1,5 @@
 
-b
+
 # Load libraries ----------------------------------------------------------
 require(pacman)
 pacman::p_load(raster, rgdal, rgeos, stringr, sf, tidyverse, fasterize, landscapemetrics)
@@ -9,6 +9,82 @@ rm(list = ls())
 options(scipen = 999)
 
 prj <- '+proj=tmerc +lat_0=4.596200416666666 +lon_0=-74.07750791666666 +k=1 +x_0=1000000 +y_0=1000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
+
+# Functions to use --------------------------------------------------------
+create_graph <- function(tbl, nme, axs_y){
+  gg <- ggplot(data = tbl, aes(x = as.character(class), y = value, fill = year, group = year)) +
+    geom_col(position = 'dodge') +
+    scale_fill_manual(values = c('#01DF3A', '#0B610B', '#5F4C0B')) +
+    labs(x = '',
+         y = axs_y, 
+         fill = '') +
+    theme(legend.position = 'top', 
+          axis.text.x = element_text(angle = 0, vjust = 0.5, size = 10),
+          axis.text.y = element_text(size = 10)) 
+  ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', nme, '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
+  return(gg)
+}
+pland_function <- function(rst, year){
+  
+  # rst <- stk[[1]]
+  # year <- 2000
+  
+  rsl <- rst %>% 
+    lsm_c_pland() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+  
+}
+cpland_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_cpland() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+np_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_np() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+te_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_te() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+mean_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_area_mn() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+cv_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_area_cv() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+area_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_area() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
 
 # Load data ---------------------------------------------------------------
 fls <- list.files('../tif/cover', full.names = T, pattern = '.tif$')
@@ -24,27 +100,38 @@ names(stk) <- c('cov_00', 'cov_05', 'cov_10')
 # Calculating the metrics -------------------------------------------------
 
 # Porcentaje de ocupacion de cada una de las categorias 
+pland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = pland_function) %>% bind_rows()
+gg_pland <- create_graph(tbl = pland, nme = 'pland')
 
-pland_function <- function(rst, year){
+# Core percentage land average --------------------------------------------
+cpland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = cpland_function) %>% bind_rows()
+gg_cpland <- create_graph(tbl = cpland, nme = 'cpland')
 
-  rsl <- rst %>% 
-    rasterToPoints %>% 
-    as_tibble() %>% 
-    setNames(c('x', 'y', 'cov')) %>% 
-    group_by(cov) %>% 
-    dplyr::summarise(count = n()) %>% 
-    ungroup() %>% 
-    mutate(porc = count / sum(count) * 100) %>% 
-    inner_join(., lbl, by = c('cov' = 'gid')) %>% 
-    mutate(year = year)
-  print('Done!')
-  return(rsl)
-  
-}
+# Number of parches NP ----------------------------------------------------
+np <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = np_function)
+np <- bind_rows(np)
+gg_np <- create_graph(tbl = np, nme = 'np')
 
-cpland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = pland_function)
-cpland <- bind_rows(cpland)
+# Total class edge area ---------------------------------------------------
+te <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = te_function)
+te <- bind_rows(te)
+gg_te <- create_graph(tbl = te, nme = 'te', axs_y = 'm^2')
 
-ggplot(data = cpland, aes(x = name, y = porc, fill = year, group = year)) +
-  geom_col(position = 'dodge') 
+# Mean of patch area -------------------------------------------------------
+avg_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = mean_function)
+avg_patch <- bind_rows(avg_patch)
+gg_te <- create_graph(tbl = avg_patch, nme = 'avg_patch', axs_y = 'm^2')
 
+# CV  ---------------------------------------------------------------------
+cv_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = cv_function)
+cv_patch <- bind_rows(cv_patch)
+gg_cv <- create_graph(tbl = cv_patch, nme = 'cv_patch', axs_y = 'ha')
+
+# Area patch --------------------------------------------------------------
+area_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = area_function)
+area_patch <- bind_rows(area_patch)
+gg_area <- create_graph(tbl = area_patch, nme = 'area_patch', axs_y = 'ha')
+
+
+# Revisar el plot de los parches y los edges para la proxima 
+get_patches(stk[[1]])[[1]] %>% plot()
