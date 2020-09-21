@@ -1,5 +1,4 @@
 
-
 # Load libraries ----------------------------------------------------------
 require(pacman)
 pacman::p_load(raster, rgdal, rgeos, stringr, sf, tidyverse, fasterize, landscapemetrics)
@@ -85,6 +84,31 @@ area_function <- function(rst, year){
   print('Done!')
   return(rsl)
 }
+path_radios_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_gyrate() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+shape_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_shape() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+frctal_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_frac() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+
 
 # Load data ---------------------------------------------------------------
 fls <- list.files('../tif/cover', full.names = T, pattern = '.tif$')
@@ -110,7 +134,7 @@ gg_cpland <- create_graph(tbl = cpland, nme = 'cpland')
 # Number of parches NP ----------------------------------------------------
 np <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = np_function)
 np <- bind_rows(np)
-gg_np <- create_graph(tbl = np, nme = 'np')
+gg_np <- create_graph(tbl = np, nme = 'np', axs_y = 'Número de parches')
 
 # Total class edge area ---------------------------------------------------
 te <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = te_function)
@@ -132,6 +156,42 @@ area_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = area_
 area_patch <- bind_rows(area_patch)
 gg_area <- create_graph(tbl = area_patch, nme = 'area_patch', axs_y = 'ha')
 
+# Coefficient of variation radius of gyration (Area and edge metri --------
+radius <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = path_radios_function)
+radius <- bind_rows(radius)
+gg_rdus <- create_graph(tbl = radius, nme = 'gyrate', axs_y = 'CV')
 
-# Revisar el plot de los parches y los edges para la proxima 
+# Shape index -------------------------------------------------------------
+shpe <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = shape_function)
+shpe <- bind_rows(shpe)
+
+# Fractal dimension index -------------------------------------------------
+frctl <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = frctal_function)
+frctl <- bind_rows(frctl)
+gg_frctl <- create_graph(tbl = frctl, nme = 'fractal', axs_y = 'none')
+
+gg <- ggplot(data = frctl, aes(x = as.character(class), y = value, fill = as.factor(class))) +
+  geom_boxplot() +
+  facet_wrap(.~ year, nrow = 3)
+  scale_fill_manual(values = c('#01DF3A', '#0B610B', '#5F4C0B')) +
+  labs(x = '',
+       y = axs_y, 
+       fill = '') +
+  theme(legend.position = 'top', 
+        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 10),
+        axis.text.y = element_text(size = 10)) 
+ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', 'fractal', '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
+
+
+# Show patches ------------------------------------------------------------
+plot(stk)
+
+pth_00 <- show_patches(stk[[1]], class = 'global', labels = FALSE)
+crs_00 <- show_cores(stk[[1]])
+lsm_sp <- spatialize_lsm(landscape = stk[[1]])
+plot()
+show_patches(stk[[1]])
+
+spatialize_lsm(landscape = stk[[1]], what = 'lsm_c_te')
+
 get_patches(stk[[1]])[[1]] %>% plot()
