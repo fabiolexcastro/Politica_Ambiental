@@ -23,6 +23,19 @@ create_graph <- function(tbl, nme, axs_y){
   ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', nme, '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
   return(gg)
 }
+create_boxpl <- function(tbl, nme, axs_y){
+  gg <- ggplot(data = tbl, aes(x = as.character(class), group = class, y = value, fill = class, group = year)) +
+    geom_boxplot(position = 'dodge') +
+    facet_wrap(.~ year, nrow = 3, ncol = 1) +
+    labs(x = '',
+         y = axs_y, 
+         fill = '') +
+    theme(legend.position = 'top', 
+          axis.text.x = element_text(angle = 0, vjust = 0.5, size = 10),
+          axis.text.y = element_text(size = 10)) 
+  ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', nme, '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
+  return(gg)
+}
 pland_function <- function(rst, year){
   
   # rst <- stk[[1]]
@@ -108,6 +121,39 @@ frctal_function <- function(rst, year){
   print('Done!')
   return(rsl)
 }
+para_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_para() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+contig_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_contig() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+perim_frg_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_c_pafrac() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+euc_function <- function(rst, year){
+  rsl <- rst %>% 
+    lsm_p_enn() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+}
+
 
 
 # Load data ---------------------------------------------------------------
@@ -182,15 +228,64 @@ gg <- ggplot(data = frctl, aes(x = as.character(class), y = value, fill = as.fac
         axis.text.y = element_text(size = 10)) 
 ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', 'fractal', '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
 
+# Perimeter-Area ratio ----------------------------------------------------
+paraf <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = para_function)
+paraf <- bind_rows(paraf)
+gg_paraf <- create_graph(tbl = paraf, nme = 'Perimeter - Area ratio', axs_y = 'none')
+
+# Contiguity index --------------------------------------------------------
+cntgi <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = contig_function)
+cntgi <- bind_rows(cntgi)
+gg_cntgi <- create_boxpl(tbl = cntgi, nme = 'Contiguity index', axs_y = 'none')
+
+# Perimeter area fragtal dimenction ---------------------------------------
+perim_frg <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = perim_frg_function)
+perim_frg <- bind_rows(perim_frg)
+gg_perim_frg <- create_graph(tbl = perim_frg, nme = 'Perimeter-Area Fractal dimension', axs_y = 'none')
+
+# Euclidean nearest neighbor distance -------------------------------------
+euc_enn <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = euc_function)
+euc_enn <- bind_rows(euc_enn)
+euc_enn <- euc_enn %>% mutate(value = value / 1000)
+gg_euc_enn <- create_graph(tbl = euc_enn, nme = 'Euclidean nearest patch', axs_y = 'Km')
+
+euc_enn %>% 
+  group_by(year, class) %>% 
+  dplyr::summarise(min = min(value), max = max(value), avg = mean(value)) %>%
+  ungroup() %>% 
+  filter(class != 1) %>%
+  ggplot(data = .) +
+  geom_point(aes(x = class, y = min), col = 'black') +
+  geom_line(aes(x = class, y = avg), col = 'green') +
+  geom_point(aes(x = class, y = max), col = 'red') +
+  facet_wrap(.~year, nrow = 3)
+
+# 4 index y terminamos
+
+
 
 # Show patches ------------------------------------------------------------
 plot(stk)
+vrd <- shapefile('../shp/base/vereda_test.shp')
+vrd <- spTransform(vrd, CRSobj = crs(stk))
+lsc <- raster::crop(stk[[1]], vrd) %>% raster::mask(., vrd)
+bnd <- get_boundaries(lsc)[[1]]
+
+writeRaster(lsc, './landscape.tif')
+writeRaster(bnd, './boundaries.tif')
+
+
+plot(lsc)
+plot(get_boundaries(lsc)[[1]], col = 'red', add = TRUE)
+
+
 
 pth_00 <- show_patches(stk[[1]], class = 'global', labels = FALSE)
 crs_00 <- show_cores(stk[[1]])
 lsm_sp <- spatialize_lsm(landscape = stk[[1]])
 plot()
 show_patches(stk[[1]])
+
 
 spatialize_lsm(landscape = stk[[1]], what = 'lsm_c_te')
 
