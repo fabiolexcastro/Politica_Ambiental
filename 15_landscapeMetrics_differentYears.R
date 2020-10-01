@@ -25,16 +25,19 @@ names(stk) <- c('cov_00', 'cov_05', 'cov_10')
 
 # Porcentaje de ocupacion de cada una de las categorias 
 pland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = pland_function) %>% bind_rows()
-gg_pland <- create_graph(tbl = pland, nme = 'pland')
+gg_pland <- create_graph(tbl = pland, nme = 'pland', axs_y = 'Percentage')
+write.csv(pland, '../tbl/metrics/pland.csv', row.names = FALSE)
 
 # Core percentage land average --------------------------------------------
 cpland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = cpland_function) %>% bind_rows()
-gg_cpland <- create_graph(tbl = cpland, nme = 'cpland')
+gg_cpland <- create_graph(tbl = cpland, nme = 'cpland', axs_y = 'Percentage')
+write.csv(cpland, '../tbl/metrics/cpland.csv', row.names = FALSE)
 
 # Number of parches NP ----------------------------------------------------
 np <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = np_function)
 np <- bind_rows(np)
 gg_np <- create_graph(tbl = np, nme = 'np', axs_y = 'Número de parches')
+write.csv(np, '../tbl/metrics/number_patch.csv', row.names = FALSE)
 
 # Total class edge area ---------------------------------------------------
 te <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = te_function)
