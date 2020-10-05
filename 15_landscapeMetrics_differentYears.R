@@ -25,12 +25,12 @@ names(stk) <- c('cov_00', 'cov_05', 'cov_10')
 
 # Porcentaje de ocupacion de cada una de las categorias 
 pland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = pland_function) %>% bind_rows()
-gg_pland <- create_graph(tbl = pland, nme = 'pland', axs_y = 'Percentage')
+gg_pland <- create_graph(tbl = pland, nme = 'pland', axs_y = 'Porcentaje')
 write.csv(pland, '../tbl/metrics/pland.csv', row.names = FALSE)
 
 # Core percentage land average --------------------------------------------
 cpland <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = cpland_function) %>% bind_rows()
-gg_cpland <- create_graph(tbl = cpland, nme = 'cpland', axs_y = 'Percentage')
+gg_cpland <- create_graph(tbl = cpland, nme = 'cpland', axs_y = 'Porcentaje')
 write.csv(cpland, '../tbl/metrics/cpland.csv', row.names = FALSE)
 
 # Number of parches NP ----------------------------------------------------
@@ -43,21 +43,28 @@ write.csv(np, '../tbl/metrics/number_patch.csv', row.names = FALSE)
 te <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = te_function)
 te <- bind_rows(te)
 gg_te <- create_graph(tbl = te, nme = 'te', axs_y = 'm^2')
+write.csv(te, '../tbl/metrics/total_class_edge.csv', row.names = FALSE)
 
 # Mean of patch area -------------------------------------------------------
 avg_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = mean_function)
 avg_patch <- bind_rows(avg_patch)
-gg_te <- create_graph(tbl = avg_patch, nme = 'avg_patch', axs_y = 'm^2')
+gg_pthch <- create_graph(tbl = avg_patch, nme = 'avg_patch', axs_y = 'm^2')
+write.csv(avg_patch, '../tbl/metrics/mean_patch_area.csv', row.names = FALSE)
 
 # CV  ---------------------------------------------------------------------
 cv_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = cv_function)
 cv_patch <- bind_rows(cv_patch)
 gg_cv <- create_graph(tbl = cv_patch, nme = 'cv_patch', axs_y = 'ha')
+write.csv(cv_patch, '../tbl/metrics/cv_patch_area.csv', row.names = FALSE)
 
 # Area patch --------------------------------------------------------------
 area_patch <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = area_function)
 area_patch <- bind_rows(area_patch)
-gg_area <- create_graph(tbl = area_patch, nme = 'area_patch', axs_y = 'ha')
+area_patch <- area_patch %>% filter(class != 1)
+area_patch %>% pull(value) %>% range()
+gg_area <- create_boxpl(tbl = area_patch, nme = 'area_patch', axs_y = 'ha', lowest = 0, uppest = 1.5, outliers = NA)
+write.csv(area_patch, '../tbl/metrics/area_patch.csv', row.names = FALSE)
+
 
 # Coefficient of variation radius of gyration (Area and edge metri --------
 radius <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = path_radios_function)
