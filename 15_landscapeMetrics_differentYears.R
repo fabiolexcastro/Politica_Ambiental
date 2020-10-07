@@ -1,7 +1,7 @@
 
 # Load libraries ----------------------------------------------------------
 require(pacman)
-pacman::p_load(raster, rgdal, rgeos, stringr, sf, tidyverse, fasterize, landscapemetrics)
+pacman::p_load(raster, rgdal, rgeos, stringr, sf, tidyverse, fasterize, landscapemetrics, RColorBrewer)
 
 g <- gc(reset = TRUE)
 rm(list = ls())
@@ -65,47 +65,61 @@ area_patch %>% pull(value) %>% range()
 gg_area <- create_boxpl(tbl = area_patch, nme = 'area_patch', axs_y = 'ha', lowest = 0, uppest = 1.5, outliers = NA)
 write.csv(area_patch, '../tbl/metrics/area_patch.csv', row.names = FALSE)
 
-
-# Coefficient of variation radius of gyration (Area and edge metri --------
+# Coefficient of variation radius of gyration (Area and edge metric) --------
 radius <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = path_radios_function)
 radius <- bind_rows(radius)
-gg_rdus <- create_graph(tbl = radius, nme = 'gyrate', axs_y = 'CV')
+gg_rdus <- create_boxpl(tbl = radius, nme = 'gyrate', axs_y = 'CV', outliers = NA, lowest = 0, uppest = 300)
+write.csv(radius, '../tbl/metrics/gyration.csv', row.names = FALSE)
 
 # Shape index -------------------------------------------------------------
 shpe <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = shape_function)
 shpe <- bind_rows(shpe)
+gg_shpe <- create_boxpl(tbl = shpe, nme = 'shape_index', axs_y = '', outliers = NA, lowest = 0, uppest = 3)
+write.csv(shpe, '../tbl/metrics/shape_index.csv', row.names = FALSE)
 
 # Fractal dimension index -------------------------------------------------
 frctl <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = frctal_function)
 frctl <- bind_rows(frctl)
-gg_frctl <- create_graph(tbl = frctl, nme = 'fractal', axs_y = 'none')
-
-gg <- ggplot(data = frctl, aes(x = as.character(class), y = value, fill = as.factor(class))) +
-  geom_boxplot() +
-  facet_wrap(.~ year, nrow = 3)
-  scale_fill_manual(values = c('#01DF3A', '#0B610B', '#5F4C0B')) +
-  labs(x = '',
-       y = axs_y, 
-       fill = '') +
-  theme(legend.position = 'top', 
-        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 10),
-        axis.text.y = element_text(size = 10)) 
-ggsave(plot = gg, filename = paste0('../png/graphs/landscapemetrics/', 'fractal', '.png'), units = 'in', width = 12, height = 9, dpi = 300)  
+range(frctl$value)
+gg_frctl <- create_boxpl(tbl = frctl, nme = 'fractal', axs_y = '', outliers = NA, lowest = 0.9, uppest = 1.5)
+write.csv(frctl, '../tbl/metrics/fractal_index.csv', row.names = FALSE)
 
 # Perimeter-Area ratio ----------------------------------------------------
 paraf <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = para_function)
 paraf <- bind_rows(paraf)
-gg_paraf <- create_graph(tbl = paraf, nme = 'Perimeter - Area ratio', axs_y = 'none')
+range(paraf)
+gg_paraf <- create_boxpl(tbl = paraf, nme = 'Perimeter - Area ratio', axs_y = '', outliers = NA, lowest = 0, uppest = 0.2)
+write.csv(paraf, '../tbl/metrics/paraf.csv', row.names = FALSE)
 
 # Contiguity index --------------------------------------------------------
 cntgi <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = contig_function)
 cntgi <- bind_rows(cntgi)
-gg_cntgi <- create_boxpl(tbl = cntgi, nme = 'Contiguity index', axs_y = 'none')
+gg_cntgi <- create_boxpl(tbl = cntgi, nme = 'Contiguity index', axs_y = '', outliers = NA, lowest = 0, uppest = 1)
+write.csv(paraf, '../tbl/metrics/contiguity_function.csv', row.names = FALSE)
 
 # Perimeter area fragtal dimenction ---------------------------------------
 perim_frg <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = perim_frg_function)
 perim_frg <- bind_rows(perim_frg)
-gg_perim_frg <- create_graph(tbl = perim_frg, nme = 'Perimeter-Area Fractal dimension', axs_y = 'none')
+gg_perim_frg <- create_graph(tbl = perim_frg, nme = 'Perimeter-Area Fractal dimension', axs_y = '')
+write.csv(perim_frg, '../tbl/metrics/perimeter_area_fractal_dimension.csv', row.names = FALSE)
+
+gg <- ggplot(data = perim_frg, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
+  geom_line(size = 2) +
+  scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
+  scale_colour_manual(values = brewer.pal(n = 6, name = 'Pastel1')) +
+  theme_bw() + 
+  theme(legend.position = 'top', #c(0.1, 0.85)
+        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12, face = 'bold'),
+        axis.title.x = element_text(size = 12, face = 'bold'),
+        legend.text = element_text(size = 12),
+        legend.title = element_blank()) +
+  labs(x = '', y = '') +
+  guides(colour = guide_legend(nrow = 1, ncol = 6))
+
+ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Perimeter-Area Fractal dimension.png', units = 'in', width = 12, height = 9, dpi = 300)
+
 
 # Euclidean nearest neighbor distance -------------------------------------
 euc_enn <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = euc_function)
