@@ -9,7 +9,7 @@ create_graph <- function(tbl, nme, axs_y){
     labs(x = '',
          y = axs_y, 
          fill = '') +
-    theme(legend.position = c(0.1, 0.8), 
+    theme(legend.position = c(0.1, 0.8), # c(0.9, 0.8)
           axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
           axis.text.y = element_text(size = 11),
           axis.title.y = element_text(size = 12, face = 'bold'),
@@ -23,14 +23,14 @@ create_boxpl <- function(tbl, nme, axs_y, lowest, uppest, outliers){
   # nme <- 'area_patch'
   # axs_y <- 'ha'
   gg <- ggplot(data = tbl, aes(x = as.character(class), y = value, color = year)) +
-    geom_boxplot(outlier.shape = outliers) +
+    geom_boxplot(outlier.shape = outliers, size = 1.1) +
     scale_y_continuous(limits = c(lowest, uppest)) +
-    scale_color_manual(values = c('#ff7f7e', '#7fcfc4', '#f8d67f')) 
+    scale_color_manual(values = c('#ff7f7e', '#7fcfc4', '#f8d67f')) +
     labs(x = '',
          y = axs_y, 
          fill = '') +
     theme_bw() + 
-    theme(legend.position = c(0.1, 0.8), 
+    theme(legend.position = c(0.1, 0.85), #'top', 
           axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
           axis.text.y = element_text(size = 11),
           axis.title.y = element_text(size = 12, face = 'bold'),
