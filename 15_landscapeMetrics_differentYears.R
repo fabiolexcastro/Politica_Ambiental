@@ -103,10 +103,12 @@ perim_frg <- bind_rows(perim_frg)
 gg_perim_frg <- create_graph(tbl = perim_frg, nme = 'Perimeter-Area Fractal dimension', axs_y = '')
 write.csv(perim_frg, '../tbl/metrics/perimeter_area_fractal_dimension.csv', row.names = FALSE)
 
+perim_frg <- perim_frg %>% filter(class != 1)
+
 gg <- ggplot(data = perim_frg, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
-  geom_line(size = 2) +
+  geom_line(size = 2, linemitre = 100) +
   scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
-  scale_colour_manual(values = brewer.pal(n = 6, name = 'Pastel1')) +
+  scale_colour_manual(values = brewer.pal(n = 6, name = 'Paired')) +
   theme_bw() + 
   theme(legend.position = 'top', #c(0.1, 0.85)
         axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
@@ -120,47 +122,89 @@ gg <- ggplot(data = perim_frg, aes(x = as.numeric(year), y = value, color = as.c
 
 ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Perimeter-Area Fractal dimension.png', units = 'in', width = 12, height = 9, dpi = 300)
 
-
 # Euclidean nearest neighbor distance -------------------------------------
 euc_enn <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = euc_function)
 euc_enn <- bind_rows(euc_enn)
 euc_enn <- euc_enn %>% mutate(value = value / 1000)
-gg_euc_enn <- create_graph(tbl = euc_enn, nme = 'Euclidean nearest patch', axs_y = 'Km')
-
-euc_enn %>% 
-  group_by(year, class) %>% 
-  dplyr::summarise(min = min(value), max = max(value), avg = mean(value)) %>%
-  ungroup() %>% 
-  filter(class != 1) %>%
-  ggplot(data = .) +
-  geom_point(aes(x = class, y = min), col = 'black') +
-  geom_line(aes(x = class, y = avg), col = 'green') +
-  geom_point(aes(x = class, y = max), col = 'red') +
-  facet_wrap(.~year, nrow = 3)
+gg_euc_enn <- create_boxpl(tbl = euc_enn, nme = 'Euclidean nearest patch', axs_y = 'Km', lowest = 0, uppest = 0.5, outliers = NA)
+write.csv(euc_enn, '../tbl/metrics/euclidean_nearest_neighbor.csv', row.names = FALSE)
 
 # Clumpiness index --------------------------------------------------------
 clm <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = clumpy_function)
 clm <- bind_rows(clm)
 gg_clm <- create_graph(tbl = clm, nme = 'Clumpy index', axs_y = 'index')
+write.csv(clm, '../tbl/metrics/clumpiness_index.csv',  row.names = FALSE)
+
+gg <- ggplot(data = clm, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
+  geom_line(size = 2, linemitre = 100) +
+  scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
+  scale_colour_manual(values = brewer.pal(n = 7, name = 'Paired')) +
+  theme_bw() + 
+  theme(legend.position = 'top', #c(0.1, 0.85)
+        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12, face = 'bold'),
+        axis.title.x = element_text(size = 12, face = 'bold'),
+        legend.text = element_text(size = 12),
+        legend.title = element_blank()) +
+  labs(x = '', y = '') +
+  guides(colour = guide_legend(nrow = 1, ncol = 7))
+
+ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Clumpiness index.png', units = 'in', width = 12, height = 9, dpi = 300)
 
 # Percentage of like adjacencies ------------------------------------------
 padj <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = p_adj)
 padj <- bind_rows(padj)
-gg_padj <- create_graph(tbl = padj, nme = 'Percentaje of like adjajencies', axs_y = 'Percentage')
+write.csv(padj, '../tbl/metrics/percentage of like adjacencies.png', row.names = FALSE)
+
+gg <- ggplot(data = clm, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
+  geom_line(size = 2, linemitre = 100) +
+  scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
+  scale_colour_manual(values = brewer.pal(n = 7, name = 'Paired')) +
+  theme_bw() + 
+  theme(legend.position = 'top', #c(0.1, 0.85)
+        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12, face = 'bold'),
+        axis.title.x = element_text(size = 12, face = 'bold'),
+        legend.text = element_text(size = 12),
+        legend.title = element_blank()) +
+  labs(x = '', y = '') +
+  guides(colour = guide_legend(nrow = 1, ncol = 7))
+
+ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Percentaje of like adjacencies.png', units = 'in', width = 12, height = 9, dpi = 300)
 
 # Aggregation index -------------------------------------------------------
 agg <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = agg_idx)
 agg <- bind_rows(agg)
 gg_agg <- create_graph(tbl = agg, nme = 'Aggregation index', axs_y = 'Index')
+write.csv(agg, '../tbl/metrics/aggregation index.csv', row.names = FALSE)
+
+gg <- ggplot(data = agg, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
+  geom_line(size = 2, linemitre = 100) +
+  scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
+  # scale_y_continuous(limits = c(0, 100)) +
+  scale_colour_manual(values = brewer.pal(n = 7, name = 'Paired')) +
+  theme_bw() + 
+  theme(legend.position = 'top', #c(0.1, 0.85)
+        axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12, face = 'bold'),
+        axis.title.x = element_text(size = 12, face = 'bold'),
+        legend.text = element_text(size = 12),
+        legend.title = element_blank()) +
+  labs(x = '', y = '') +
+  guides(colour = guide_legend(nrow = 1, ncol = 7))
+
+ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Aggregation index.png', units = 'in', width = 12, height = 9, dpi = 300)
 
 # Largest patch index -----------------------------------------------------
 lrg <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = lrg_pth)
 lrg <- bind_rows(lrg)
-gg_lrg <- create_graph(tbl = lrg, nme = 'Largest patch index', axs_y = 'Index')
+gg_lrg <- create_graph(tbl = lrg, nme = 'Largest patch index', axs_y = 'Porcentaje')
+ggsave(plot = gg_lrg, filename = '../png/graphs/landscapemetrics/Largest patch index.png', units = 'in', width = 12, height = 9, dpi = 300)
 
-
-
-
+write.csv(lrg, '../tbl/metrics/largest patch index.csv', row.names = FALSE)
 
 # Show patches ------------------------------------------------------------
 plot(stk)
