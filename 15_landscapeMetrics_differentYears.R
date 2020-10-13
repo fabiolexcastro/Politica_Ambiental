@@ -12,10 +12,11 @@ source('./15_functions.R')
 
 # Load data ---------------------------------------------------------------
 fls <- list.files('../tif/cover', full.names = T, pattern = '.tif$')
-fls <- fls[1:3]
+fls <- grep('_2.tif', fls, value = TRUE)
 stk <- stack(fls)
 lbl <- read_csv('../tbl/cobertura/label_coberturas_rcl.csv')
 lbl <- lbl %>% mutate(name = str_sub(name, start = 8, end = nchar(name)))
+lbl <- lbl %>% filter(gid != 1)
 
 # Projecting raster
 stk <- projectRaster(stk, crs = prj, method = 'ngb')
@@ -157,7 +158,7 @@ padj <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = p_adj)
 padj <- bind_rows(padj)
 write.csv(padj, '../tbl/metrics/percentage of like adjacencies.png', row.names = FALSE)
 
-gg <- ggplot(data = clm, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
+gg <- ggplot(data = padj, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
   geom_line(size = 2, linemitre = 100) +
   scale_x_continuous(limits = c(2000, 2010), breaks = seq(2000, 2010, 5)) +
   scale_colour_manual(values = brewer.pal(n = 7, name = 'Paired')) +
