@@ -9,7 +9,7 @@ create_graph <- function(tbl, nme, axs_y){
     labs(x = '',
          y = axs_y, 
          fill = '') +
-    theme(legend.position = c(0.1, 0.8), # c(0.9, 0.8)
+    theme(legend.position = 'top', # c(0.9, 0.8)
           axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
           axis.text.y = element_text(size = 11),
           axis.title.y = element_text(size = 12, face = 'bold'),
@@ -165,7 +165,6 @@ clumpy_function <- function(rst, year){
   print('Done!')
   return(rsl)
 }
-
 p_adj <- function(rst, year){
   rsl <- rst %>% 
     lsm_c_pladj() %>% 
@@ -174,7 +173,6 @@ p_adj <- function(rst, year){
   print('Done!')
   return(rsl)
 }
-
 agg_idx <- function(rst, year){
   rsl <- rst %>% 
     lsm_c_ai() %>% 
@@ -183,7 +181,6 @@ agg_idx <- function(rst, year){
   print('Done!')
   return(rsl)
 }
-
 lrg_pth <- function(rst, year){
   rsl <- rst %>% 
     lsm_c_lpi() %>% 
@@ -192,4 +189,15 @@ lrg_pth <- function(rst, year){
   print('Done!')
   return(rsl)
 }
+lsm_c_dcad_function <- function(rst, year){
+  
+  rsl <- rst %>% 
+    lsm_c_dcad() %>% 
+    inner_join(., lbl, by = c('class' = 'gid')) %>% 
+    mutate(year = year)
+  print('Done!')
+  return(rsl)
+  
+}
+
 
