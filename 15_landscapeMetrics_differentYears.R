@@ -156,7 +156,7 @@ ggsave(plot = gg, filename = '../png/graphs/landscapemetrics/Clumpiness index.pn
 # Percentage of like adjacencies ------------------------------------------
 padj <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = p_adj)
 padj <- bind_rows(padj)
-write.csv(padj, '../tbl/metrics/percentage of like adjacencies.png', row.names = FALSE)
+write.csv(padj, '../tbl/metrics/percentage of like adjacencies.csv', row.names = FALSE)
 
 gg <- ggplot(data = padj, aes(x = as.numeric(year), y = value, color = as.character(class), group = as.character(class))) +
   geom_line(size = 2, linemitre = 100) +
@@ -206,6 +206,15 @@ gg_lrg <- create_graph(tbl = lrg, nme = 'Largest patch index', axs_y = 'Porcenta
 ggsave(plot = gg_lrg, filename = '../png/graphs/landscapemetrics/Largest patch index.png', units = 'in', width = 12, height = 9, dpi = 300)
 
 write.csv(lrg, '../tbl/metrics/largest patch index.csv', row.names = FALSE)
+
+# Disjunct core area density -----------------------------------------------
+lsm_c_dcad()
+lsm_dcad <- map2(.x = unstack(stk), .y = c('2000', '2005', '2010'), .f = lsm_c_dcad_function)
+lsm_dcad <- bind_rows(lsm_dcad)
+
+gg_dsc <- create_graph(tbl = lsm_dcad, nme = 'Disjunct core area density', axs_y = '# Parches / 100 ha')
+ggsave(plot = gg_dsc, filename = '../png/graphs/landscapemetrics/Disjunct core area density.png', units = 'in', width = 12, height = 9, dpi = 300)
+write.csv(lsm_dcad, '../tbl/metrics/Disjunct core area density.csv', row.names = FALSE)
 
 # Show patches ------------------------------------------------------------
 plot(stk)
