@@ -1,7 +1,7 @@
 
 # Load libraries ---------------------------------------------------
 require(pacman)
-pacman::p_load(raster, rgdal, raster, fst, gtools, stringr, tidyverse)
+pacman::p_load(raster, rgdal, raster, fst, gtools, stringr, tidyverse, RColorBrewer)
 
 g <- gc(reset = TRUE)
 rm(list = ls())
@@ -150,3 +150,56 @@ tbl.all <- lst.tbl %>% purrr::reduce(inner_join, by = c("gid", "x", "y", "month"
 
 saveRDS(object = tbl.all, file = '../workspace/climate/table/tbl_rcp45_2030s.rds')
 write_fst(x = tbl.all, path = '../workspace/climate/table/tbl_rcp45_2030s.fst')
+
+# Remove objects
+rm(list = ls())
+
+# Read the table ----------------------------------------------------------
+tbl <- read_fst('../workspace/climate/table/tbl_rcp45_2030s.fst')
+tbl <- as_tibble(tbl)
+names(tbl) <- c('gid', 'x', 'y', 'month', 'current_prec', 'future_prec', 'current_tmean', 'future_tmean', 'current_tmin', 'future_tmin', 'current_tmax', 'future_tmax')
+
+# Labels / months
+mnt <- c('Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dic')
+lbl <- data.frame(month = 1:12, month_abb = mnt)
+tbl <- inner_join(tbl, lbl, by = 'month')
+tbl <- tbl %>% mutate(month_abb = factor(month_abb, levels = mnt))
+
+make.map <- function(var){
+  
+  var <- 'tmean'
+  
+  tb <- tbl %>% dplyr::select(gid, x, y, month_abb, contains(match = var))
+  tb <- tb %>% setNames(c('gid', 'x', 'y', 'month_abb', 'current', 'future'))
+  vr.ab <- str_sub(var, 1, 2)
+  summary(tb)
+  
+  if(vr.ab == 'tm'){
+    
+    clr <- RColorBrewer::brewer.pal(n = 8, name = 'YlOrRd')
+    
+    my_map <- ggplot(tb) +
+      geom_tile(aes(x = x, y =  y, fill = current)) +
+      facet_wrap(~ month_abb) +
+      scale_fill_gradientn(colours = clr, 
+                           na.value = 'white', limits = c(150, 350), breaks = seq(150, 350, 50)) +
+      # geom_polygon(data = mps, aes(x=long, y = lat, group = group), color = 'grey', fill='NA') +
+      theme_bw() +
+      # scale_x_continuous(breaks = c(-78, -77, -76, -75)) +
+      coord_equal(xlim = extent(mps)[1:2], ylim = extent(mps)[3:4]) +
+      labs(title = 'Precipitación acumulada RCP 8.5 2080s', fill = 'mm',  x = 'Longitud', y = 'Latitud') +
+      theme(legend.position = 'bottom',
+            plot.title = element_text(hjust = 0.5),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            legend.key.width = unit(5, 'line')) +
+      guides(shape = guide_legend(override.aes = list(size = 10)))
+    
+  } else {
+    
+    clr <- RColorBrewer::brewer.pal(n = 8, name = 'Blues')
+    
+  }
+    
+}
+
