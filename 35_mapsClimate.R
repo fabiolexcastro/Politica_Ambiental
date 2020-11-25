@@ -1,7 +1,7 @@
 
 # Load libraries ---------------------------------------------------
 require(pacman)
-pacman::p_load(raster, rgdal, raster, fst, gtools, stringr, tidyverse, RColorBrewer)
+pacman::p_load(raster, rgdal, raster, sf, fst, gtools, stringr, tidyverse, RColorBrewer, pastecs, psych)
 
 g <- gc(reset = TRUE)
 rm(list = ls())
@@ -97,6 +97,58 @@ calc_ensemble <- function(pth){
   Map('writeRaster', x = unstack(rst), filename = paste0(out, '/', names(rst), '.tif'), overwrite = TRUE)
   
 }
+mapping <- function(columna){
+  
+  gg <- ggplot(tb) +
+    geom_tile(aes_string(x = 'x', y = 'y', fill = columna)) +
+    facet_wrap(~ month_abb) +
+    scale_fill_gradientn(colours = clr, 
+                         na.value = 'white') + #, limits = c(stt[1], stt[2])
+    geom_polygon(data = vrd, aes(x=long, y = lat, group = group), color = 'grey', fill='NA') +
+    coord_equal() +
+    theme_bw() +
+    theme(legend.position = 'bottom',
+          plot.title = element_text(hjust = 0.5),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.key.width = unit(5, 'line')) +
+    guides(shape = guide_legend(override.aes = list(size = 10))) +
+    labs(x = 'Longitud', y = 'Latitud', fill = gsub('_', ' ', columna))
+  
+}
+make.map <- function(var){
+  
+  # var <- 'prec'
+  
+  tb <- tbl %>% dplyr::select(gid, x, y, month_abb, contains(match = var))
+  tb <- tb %>% setNames(c('gid', 'x', 'y', 'month_abb', 'Linea_base', 'Futuro'))
+  vr.ab <- str_sub(var, 1, 2)
+  
+  vls <- c(pull(tb, 5), pull(tb, 6))
+  stt <- summary(vls) %>% as.numeric()
+  stt <- stt[c(1,6)]
+  
+  summary(tb$Linea_base)
+  summary(tb$Futuro)
+  
+  if(vr.ab == 'tm'){
+    
+    clr <- RColorBrewer::brewer.pal(n = 8, name = 'YlOrRd')
+    
+  } else {
+    
+    clr <- RColorBrewer::brewer.pal(n = 8, name = 'Blues')
+    
+  }
+  
+  map.crn <- mapping(columna = 'Linea_base')
+  map.ftr <- mapping(columna = 'Futuro')
+  ggsave(plot = map.crn, filename = paste0('../png/maps/climate/', 'rcp45_2030s_', var, '_current.png'), units = 'in', width = 12, height = 9, dpi = 300)
+  ggsave(plot = gg, filename = paste0('../png/maps/climate/', 'rcp45_2030s_', var, '_future.png'), units = 'in', width = 12, height = 9, dpi = 300)
+  
+  print('Done!')
+  
+}
 
 # Load data --------------------------------------------------------
 crn <- list.files('../tif/climate/current', full.names = TRUE, pattern = '.tif$') 
@@ -155,6 +207,7 @@ write_fst(x = tbl.all, path = '../workspace/climate/table/tbl_rcp45_2030s.fst')
 rm(list = ls())
 
 # Read the table ----------------------------------------------------------
+vrd <- shapefile('../shp/base/veredas_ok.shp')
 tbl <- read_fst('../workspace/climate/table/tbl_rcp45_2030s.fst')
 tbl <- as_tibble(tbl)
 names(tbl) <- c('gid', 'x', 'y', 'month', 'current_prec', 'future_prec', 'current_tmean', 'future_tmean', 'current_tmin', 'future_tmin', 'current_tmax', 'future_tmax')
@@ -164,42 +217,10 @@ mnt <- c('Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', '
 lbl <- data.frame(month = 1:12, month_abb = mnt)
 tbl <- inner_join(tbl, lbl, by = 'month')
 tbl <- tbl %>% mutate(month_abb = factor(month_abb, levels = mnt))
+tbl <- tbl %>% mutate_if(.predicate = contains('tm'), .funs = . / 10)
 
-make.map <- function(var){
-  
-  var <- 'tmean'
-  
-  tb <- tbl %>% dplyr::select(gid, x, y, month_abb, contains(match = var))
-  tb <- tb %>% setNames(c('gid', 'x', 'y', 'month_abb', 'current', 'future'))
-  vr.ab <- str_sub(var, 1, 2)
-  summary(tb)
-  
-  if(vr.ab == 'tm'){
-    
-    clr <- RColorBrewer::brewer.pal(n = 8, name = 'YlOrRd')
-    
-    my_map <- ggplot(tb) +
-      geom_tile(aes(x = x, y =  y, fill = current)) +
-      facet_wrap(~ month_abb) +
-      scale_fill_gradientn(colours = clr, 
-                           na.value = 'white', limits = c(150, 350), breaks = seq(150, 350, 50)) +
-      # geom_polygon(data = mps, aes(x=long, y = lat, group = group), color = 'grey', fill='NA') +
-      theme_bw() +
-      # scale_x_continuous(breaks = c(-78, -77, -76, -75)) +
-      coord_equal(xlim = extent(mps)[1:2], ylim = extent(mps)[3:4]) +
-      labs(title = 'Precipitación acumulada RCP 8.5 2080s', fill = 'mm',  x = 'Longitud', y = 'Latitud') +
-      theme(legend.position = 'bottom',
-            plot.title = element_text(hjust = 0.5),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            legend.key.width = unit(5, 'line')) +
-      guides(shape = guide_legend(override.aes = list(size = 10)))
-    
-  } else {
-    
-    clr <- RColorBrewer::brewer.pal(n = 8, name = 'Blues')
-    
-  }
-    
-}
+tbl <- as_tibble(cbind(tbl %>% dplyr::select(-contains('tm')), tbl %>% dplyr::select(contains('tm')) %>% mutate_all(.funs = function(x){x / 10})))
 
+# Apply the function to make the maps -------------------------------------
+vrs <- c('prec', 'tmean', 'tmax', 'tmin')
+map(.x = vrs, .f = make.map)
