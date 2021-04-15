@@ -1,0 +1,564 @@
+// ============================================================================================================================================= //
+// ============================================================================================================================================= //
+// PREPROCESS FOR SENTINEL 2 IMAGES
+// AUTOR: Jorge Andrés Perez Escobar
+// DATE: 02-04-2020
+// ============================================================================================================================================= //
+// ============================================================================================================================================= //
+
+// D
+// ============================================================================================================================================= //
+// ============================================================================================================================================= //
+// HTML
+// ============================================================================================================================================= //
+// ============================================================================================================================================= //
+
+// Visualization parameters of titles
+var vistittle = {
+  fontWeight: 'bold', 
+  fontSize: '14px', 
+  width: '500px',
+  padding: '4px 4px 4px 4px',
+  border: '1px solid black',
+  color: 'white',
+  backgroundColor: 'black',
+  textAlign: 'center'
+  };
+
+var visLabels = {
+  fontWeight: 'bold', 
+  fontSize: '14px', 
+  width: '500px',
+  padding: '4px 4px 4px 4px',
+  border: '1px solid black',
+  color: 'white',
+  backgroundColor: 'black',
+  textAlign: 'left'
+};
+
+var visSelect = {
+  width: '200px',
+  color: 'blue'
+};
+
+
+
+// Select topographic corrections
+var items_Topographic = ["SCS","SCS+c"];
+var items_TC = ["Yes","No"];
+var items_SHadowMask = ["Yes","No"];
+
+var area = ui.Panel(
+  [
+    ui.Label({value:'File', style:{color:'blue'}}),
+    ui.Textbox({value:'users/jorgeperez/Salvador_CRS/Chalatenango', style:{stretch: 'horizontal'}}) 
+  ],
+  ui.Panel.Layout.Flow('horizontal'),
+  {stretch: 'horizontal'}
+);
+
+
+var startDateText = ui.Panel(
+  [
+    ui.Label({value:'Start date', style:{color:'blue'}}),
+    ui.Textbox({value:'2018-01-01', style:{stretch: 'horizontal'}}) 
+  ],
+  ui.Panel.Layout.Flow('horizontal'),
+  {stretch: 'horizontal'}
+);
+
+var endDateText = ui.Panel(
+  [
+    ui.Label({value:'End date', style:{color:'blue'}}),
+    ui.Textbox({value:'2018-12-31', style:{stretch: 'horizontal'}}) 
+  ],
+  ui.Panel.Layout.Flow('horizontal'),
+  {stretch: 'horizontal'}
+);
+
+var topo = ui.Select({items: items_Topographic, placeholder: "Select topographic correction", style: visSelect});
+var TC_select = ui.Select({items: items_TC, placeholder: "Select Yes/No ", style: visSelect});
+var ShadowMask_select = ui.Select({items: items_SHadowMask, placeholder: "Select Yes/No ", style: visSelect});
+var button = ui.Button({label:'Run process', style:{color:'blue'}});
+var checkNDVI = ui.Checkbox({label:'NDVI', value:false, style:{color:'blue'}});
+var checkNDBI = ui.Checkbox({label:'NDBI', value:false, style:{color:'blue'}});
+var checkMNDWI = ui.Checkbox({label:'MNDWI', value:false, style:{color:'blue'}});
+
+
+// Main panel
+var mainPanel = ui.Panel()
+.add(ui.Label('Sentinel-2 Image preprocessing',vistittle))
+.add(ui.Label('Copy path from asset', visLabels))
+.add(area)
+.add(ui.Label('Processing dates',visLabels))
+.add(startDateText)
+.add(endDateText)
+.add(ui.Label('Select topographic correction: SCS+c or SCS',visLabels))
+.add(topo)
+.add(ui.Label('Select vegetation indexes',visLabels))
+.add(checkNDVI)
+.add(checkMNDWI)
+.add(ui.Label('Do you want apply Taselled Cap process',visLabels))
+.add(TC_select)
+.add(ui.Label('Do you want apply shadow mask process?',visLabels))
+.add(ShadowMask_select)
+.add(button);
+
+
+
+ui.root.add(mainPanel);
+
+
+button.onClick( function(){
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Roy                                                                                                                                         //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var roi_text = area.widgets().get(1).getValue()
+  var res = roi_text.substr(25);
+  var roi = ee.FeatureCollection(area.widgets().get(1).getValue())
+  Map.addLayer(roi,{},"Area")
+  Map.centerObject(roi);
+  
+  // =================================================================================================== //
+  //                             CAMBIO EN FECHAS DE PROCESAMIENTO                                       //
+  // =================================================================================================== //
+  var startDate = ee.Date(startDateText.widgets().get(1).getValue());
+  var endDate = ee.Date(endDateText.widgets().get(1).getValue());
+  
+  var startDateString = startDateText.widgets().get(1).getValue();
+  var endDateString = endDateText.widgets().get(1).getValue();
+  
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Topographic correction:                                                                                                                     //
+  //   Choose:                                                                                                                                     //
+  //         - SCS                                                                                                                                 //
+  //         - SCSc                                                                                                                               //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var topographic_correction = topo.getValue();
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Vegetation indexes: You can select "Yes/No" to process NDVI, NDBI and MNDWI                                                                 //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var TC_transform = TC_select.getValue();
+  
+  
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // IMAGE COLLECTION:                                                                                                                             //
+  // - Sentinel2 images                                                                                                                            //
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  var s2 = ee.ImageCollection('COPERNICUS/S2');
+  s2 = s2.filterBounds(roi)
+  .filterDate(startDate,endDate)
+  .select(['B1','B2','B3','B4','B8','B8A','B10','B11','B12','QA60'],['aerosol','blue','green','red','nir','red4','cirrus','swir1','swir2','QA60']);
+  
+  var oriImage = s2.reduce(ee.Reducer.median()).clip(roi);
+  
+  var clipFunction = function(image){
+    var imageClip = image.clip(roi);
+    return imageClip;
+  };
+  s2 = s2.map(clipFunction);
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // ATMOSPHERIC CORRECTIONS:                                                                                                                      //
+  // - Mask Clouds                                                                                                                                 //
+  // - Clouds Score                                                                                                                                //
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Mask Clouds                                                                                                                                 //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  function maskS2clouds(image) {
+    var qa = image.select('QA60');
+    // Bits 10 and 11 are clouds and cirrus, respectively.
+    var cloudBitMask = ee.Number(2).pow(10).int();
+    var cirrusBitMask = ee.Number(2).pow(11).int();
+    // Both flags should be set to zero, indicating clear conditions.
+    var mask = qa.bitwiseAnd(cloudBitMask).eq(0).and(
+      qa.bitwiseAnd(cirrusBitMask).eq(0));
+    
+    // Return the masked and scaled data.
+    return image.updateMask(mask).divide(10000).copyProperties(image, ["system:time_start", "MEAN_SOLAR_AZIMUTH_ANGLE",
+    "MEAN_SOLAR_ZENITH_ANGLE"]);
+  }
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Clouds Score                                                                                                                                //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var rescale = function(img, threshold){
+    return img.subtract(threshold[0]).divide(threshold[1] - threshold[0]);
+  };
+  
+  // cloudScoreThresh: If using the cloudScoreTDOMShift method-Threshold for cloud 
+  //    masking (lower number masks more clouds.  Between 10 and 30 generally 
+  //    works best)
+  var cloudScoreThresh = 10; // original: 20
+  
+  // zScoreThresh: Threshold for cloud shadow masking- lower number masks out
+  // less. Between -0.8 and -1.2 generally works well
+  var zScoreThresh = -1.0; //original: -0.8
+  
+  // shadowSumThresh: Sum of IR bands to include as shadows within TDOM and the 
+  //    shadow shift method (lower number masks out less)
+  var shadowSumThresh = 0.35; // original: 0.35
+  
+  // contractPixels: The radius of the number of pixels to contract (negative 
+  //    buffer) clouds and cloud shadows by. Intended to eliminate smaller cloud 
+  //    patches that are likely errors
+  // (1.5 results in a -1 pixel buffer)(0.5 results in a -0 pixel buffer)
+  // (1.5 or 2.5 generally is sufficient)
+  var contractPixels = 1.5; // original: 1.5
+  
+  // dilatePixels: The radius of the number of pixels to dilate (buffer) clouds 
+  //    and cloud shadows by. Intended to include edges of clouds/cloud shadows 
+  //    that are often missed
+  // (1.5 results in a 1 pixel buffer)(0.5 results in a 0 pixel buffer)
+  // (2.5 or 3.5 generally is sufficient)
+  var dilatePixels = 2.5; // original: 2.5
+  
+  
+  var CloudScore = function(img){
+    var score = ee.Image(1);
+    // clouds are reasoinably bright
+    score = score.min(rescale(img.select(['blue']),[0.1, 0.5]));
+    score = score.min(rescale(img.select(['aerosol']),[0.1,0.3]));
+    score = score.min(rescale(img.select(['aerosol']).add(img.select(['cirrus'])),[0.15,0.2]));
+    score = score.min(rescale(img.select(['red']).add(img.select(['green'])).add(img.select('blue')),[0.2,0.8]));
+    score = score.min(rescale(img.select(['nir']).add(img.select(['swir1'])).add(img.select(['swir2'])),[0.3,0.8]));
+    
+    // clouds are moist
+    var ndmi = img.normalizedDifference(['red4','swir1']);
+    score = score.min(rescale(ndmi, [-0.1, 0.1]));
+    
+    // clouds are not snow
+    var ndsi = img.normalizedDifference(['green','swir1']);
+    score = score.min(rescale(ndsi,[0.8,0.6])).rename('cloudScore');
+    
+    //return img.updateMask(score.lt(0)).addBands(score);
+    score = score.multiply(100).byte();
+    score = score.clamp(0,100);
+    var cloudMask = score.lt(cloudScoreThresh).focal_max(contractPixels).focal_min(dilatePixels).rename('cloudMask');
+    var newImg = img.updateMask(cloudMask);
+    return newImg.addBands(cloudMask);
+  };
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Shadow mask                                                                                                                                 //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var shadowSumBands = s2.select(['nir','swir1']);
+  var irStdDev = shadowSumBands.reduce(ee.Reducer.stdDev());
+  var irMean = shadowSumBands.reduce(ee.Reducer.mean());
+  var LTA = ee.Image([irStdDev,irMean]);
+  
+  function shadowMask(collection) {
+    var shadowSumBands = ['nir','swir1'];
+    var irStdDev = LTA.select(['nir_stdDev','swir1_stdDev']);
+    var irMean = LTA.select(['nir_mean','swir1_mean']);
+    
+    var maskDarkOutliers = function(img){
+      var zScore = img.select(shadowSumBands).subtract(irMean).divide(irStdDev);
+      var irSum = img.select(shadowSumBands).reduce(ee.Reducer.sum());
+      var TDOMMask = zScore.lt(zScoreThresh).reduce(ee.Reducer.sum()).eq(2).and(irSum.lt(shadowSumThresh));
+      TDOMMask = TDOMMask.focal_min(contractPixels).focal_max(dilatePixels).rename('TDOMMask');
+      return img.updateMask(TDOMMask.not());
+    };
+    
+    // Mask out dark dark outliers
+    collection = collection.map(maskDarkOutliers);
+    return collection;
+  }
+  
+  
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // IMAGE AFTER ATMOSPHERIC CORRECTION
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  s2 = s2.map(maskS2clouds)
+    .map(CloudScore);
+  
+    var ShadowMask_process = ShadowMask_select.getValue();
+  if(ShadowMask_process == 'Yes'){
+    s2 = shadowMask(s2);
+  }
+  else{
+    s2 = s2
+  }
+  
+  
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // TOPOGRAPHIC CORRECTION:
+  // - cosenos
+  // - scs
+  // - scs+c
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  var terrain = ee.call('Terrain', ee.Image('USGS/SRTMGL1_003'));
+  var slope = ee.Terrain.slope(terrain).multiply(3.14159265359).divide(180).clip(roi);
+  var aspect = ee.Terrain.aspect(terrain).multiply(3.14159265359).divide(180).clip(roi);
+  var dem = terrain.select('elevation').clip(roi).rename('dem');
+  
+  var SLOPE = slope.resample('bicubic').reproject({
+    crs: slope.projection().crs(),
+    scale: 10
+  });
+  
+  var ASPECT = aspect.resample('bicubic').reproject({
+    crs: aspect.projection().crs(),
+    scale: 10
+  });
+  
+  var DEM = dem.resample('bicubic').reproject({
+    crs: dem.projection().crs(),
+    scale: 10
+  });
+  
+  var cosSLOPE = SLOPE.cos();
+  var sinSLOPE = SLOPE.sin();
+  
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - IC                                                                                                                                          //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // illumination correction:
+  var topo_IC = function(image){
+    var ZENITH_rad = ee.Image.constant(ee.Number(image.get('MEAN_SOLAR_ZENITH_ANGLE'))).multiply(3.14159265359).divide(180);
+    var AZIMUTH_rad = ee.Image.constant(ee.Number(image.get('MEAN_SOLAR_AZIMUTH_ANGLE')).multiply(3.14159265359).divide(180)); 
+    var cosZENITH_rad = ZENITH_rad.cos();
+    var SLOPE_illumination = cosSLOPE.expression("cosZENITH_rad * cosSLOPE",{
+      'cosZENITH_rad': cosZENITH_rad,
+      'cosSLOPE': cosSLOPE});
+      
+    // aspect part of the illumination condition
+    var sinZENITH_rad = ZENITH_rad.sin(); 
+    var cosAziDiff = (AZIMUTH_rad.subtract(ASPECT)).cos();
+    var ASPECT_illumination = sinZENITH_rad.expression("sinZENITH_rad * sinSLOPE * cosAziDiff", 
+                                           {'sinZENITH_rad': sinZENITH_rad,
+                                            'sinSLOPE': sinSLOPE,
+                                            'cosAziDiff': cosAziDiff});
+                                          
+    // full illumination condition (IC)
+    var ic = SLOPE_illumination.add(ASPECT_illumination);
+    // Add IC to original image
+    var img_plus_ic = ee.Image(image.addBands(ic.rename('IC')).addBands(cosZENITH_rad.rename('cosZenit')).addBands(cosSLOPE.rename('cosSlope')).addBands(SLOPE.rename('slope')));
+    return img_plus_ic;
+  };
+  
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Image after illumination correction                                                                                                         //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  var s2 = s2.map(topo_IC)
+  var ImageAfterIC = s2.reduce(ee.Reducer.median());
+  
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - SCS                                                                                                                                         //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  if(topographic_correction == 'SCS'){
+    function SCS (image){
+      var zenith = ee.Number(image.get('MEAN_SOLAR_ZENITH_ANGLE')).multiply(3.14159265359).divide(180);
+      var cosaz = zenith.cos();
+      var cosslope = cosSLOPE;
+      
+      var newimg = image.expression(
+        'img * (((cosp*cosz)) / (cosi))',{
+          'img': image.select('blue', 'green', 'red', 'nir', 'cirrus', 'swir1', 'swir2'),
+          'cosp': cosaz,
+          'cosz': cosslope,
+          'cosi': image.select('IC'),
+        }
+      );
+      return newimg;
+    }
+    
+    // --------------------------------------------------------------------------------------------------------------------------------------------- //
+    // - Image after topographic correction SCS                                                                                                      //
+    // --------------------------------------------------------------------------------------------------------------------------------------------- //
+    var s2 = s2.map(SCS);
+    var ImageAfterSCS = s2.reduce(ee.Reducer.median());
+  }
+  
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - SCS+c                                                                                                                                       //
+  // --------------------------------------------------------------------------------------------------------------------------------------------- //
+  if(topographic_correction == 'SCSc'){
+    function SCSc (image){
+      var zenith = ee.Number(image.get('MEAN_SOLAR_ZENITH_ANGLE')).multiply(3.14159265359).divide(180);
+      var cosaz = zenith.cos();
+      var cosslope = cosSLOPE;
+      
+      var bnames2 = ['blue','green','red','nir','swir1','swir2'];
+      var x = image.select('IC');
+      var y = image.select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2']);
+      var union = ee.Image.cat(x,y);
+      
+      var lr_reducer = ee.Reducer.linearRegression({
+        numX: 1,
+        numY: 6
+      });
+      
+      // fit the model
+      var fit = union.reduceRegion({
+        reducer: lr_reducer,
+        geometry: roi,
+        scale: 10,
+        maxPixels: 1e13
+      });
+      
+      fit = fit.combine({"coefficients": ee.Array([[1],[1]])});// crea un arreglo con de una columna
+      
+      // Get the coefficients as a nested list, cast it to an array, and get
+      // just the selected column
+      var slo = (ee.Array(fit.get('coefficients')).get([1,0])); //selecciona el valor en la segunda posición del vector
+      var int = (ee.Array(fit.get('coefficients')).get([0,0]));// selecciona el valor en la primera posición del vector
+      
+      //Calculate C parameter C= a/b
+      var C = int.divide(slo);
+      
+      var newimg = image.expression(
+        'img * (((cosp*cosz)+C) / (cosi+C))',{
+          'img': image.select('blue', 'green', 'red', 'nir', 'cirrus', 'swir1', 'swir2'),
+          'cosp': cosaz,
+          'cosz': cosslope,
+          'cosi': image.select('IC'),
+          'C': C
+        }
+      );
+      return newimg;
+    }
+    
+    // --------------------------------------------------------------------------------------------------------------------------------------------- //
+    // - Image after topographic correction SCSc                                                                                                     //
+    // --------------------------------------------------------------------------------------------------------------------------------------------- //
+    s2 = s2.map(SCSc);
+    var ImageAfterSCSc = s2.reduce(ee.Reducer.median());
+  }
+  
+  
+  
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // TASSELED CAP TRANSFORM: wetness, brigthness, greeness                                                                                         //
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  if(TC_transform == 'Yes'){
+    var Tasseled_Cap = function(image){
+      var wetness = image.expression(
+        '(blue*(0.1363)) + (green*(0.3802)) + (red*(0.3072)) + (nir*(-0.0807)) + (swir1*(-0.4064)) + (swir2*(-0.5602))',{
+          'blue':image.select('blue'),
+          'green':image.select('green'),
+          'red':image.select('red'),
+          'nir':image.select('nir'),
+          'swir1':image.select('swir1'),
+          'swir2':image.select('swir2'),
+        }
+      ).rename('wetness');
+      
+      var brigthness = image.expression(
+        '(0.0822*blue) + (0.1360*green) + (0.2611*red) + (0.3895*nir) + (0.0009*cirrus) + (0.1366*swir2)',{
+          'blue':image.select('blue'),
+          'green':image.select('green'),
+          'red':image.select('red'),
+          'nir':image.select('nir'),
+          'cirrus':image.select('cirrus'),
+          'swir2':image.select('swir2'),
+        }
+      ).rename('brigthness');
+      
+      var greeness = image.expression(
+        '(blue*(-0.1128)) + (green*(-0.1680)) + (red*(-0.3480)) + (nir*0.3895) + (swir1*(-0.4578)) + (swir2*(-0.4064))',{
+          'blue':image.select('blue'),
+          'green':image.select('green'),
+          'red':image.select('red'),
+          'nir':image.select('nir'),
+          'swir1':image.select('swir1'),
+          'swir2':image.select('swir2'),
+        }
+      ).rename('greeness');
+      
+      return image.addBands([wetness, brigthness, greeness]);
+    };
+    
+    s2 = s2.map(Tasseled_Cap)
+    .select('blue','green','red','nir','swir1','swir2','greeness','brigthness','wetness');
+    var ImageAfterTC = s2.reduce(ee.Reducer.median());
+    print("Image after Tasseled Cap: ", ImageAfterTC);
+  }else{
+    s2 = s2.select('blue','green','red','nir','swir1','swir2');
+  }
+  
+  
+  
+  
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // VEGETATION INDEXES: ndvi, ndbi, mndwi                                                                                                         //
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  function VegetationIndexes(image){
+    if(checkNDVI.getValue()&&(checkMNDWI.getValue())){
+      var ndvi = image.normalizedDifference(['nir','red']).rename('NDVI');
+      var mndwi = image.normalizedDifference(['blue','nir']).rename('MNDWI');
+      return image.addBands([ndvi,mndwi]);
+    }
+    if(checkNDVI.getValue()){
+      return image.addBands(image.normalizedDifference(['nir','red']).rename('NDVI'));
+    }
+    if(checkMNDWI.getValue()){
+      return image.addBands(image.normalizedDifference(['blue','nir']).rename('MNDWI'));
+    } 
+    else{
+      return image;
+    }
+  }
+  
+  // ------------------------------------------------------------------------------------------------------------------------------------------- //
+  // - Image after vegetation indexes                                                                                                            //
+  // ------------------------------------------------------------------------------------------------------------------------------------------- //
+  s2 = s2.map(VegetationIndexes);
+  
+  var ImageAfterIndexes = s2.reduce(ee.Reducer.median());
+  
+  var s2_median = s2.reduce(ee.Reducer.median());
+  var s2_mean = s2.reduce(ee.Reducer.mean());
+  var s2_max = s2.reduce(ee.Reducer.max());
+  var s2_min = s2.reduce(ee.Reducer.min());
+  var s2_stdDev = s2.reduce(ee.Reducer.stdDev());
+  
+  s2 = ee.Image([s2_median,s2_mean,s2_max,s2_min,s2_stdDev,DEM]).float();
+  print("imagen final", s2)
+  
+  Map.addLayer(s2_median,estilo,"s2")
+
+
+
+
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  // EXPORT IMAGE                                                                                                                                  //
+  // ============================================================================================================================================= //
+  // ============================================================================================================================================= //
+  var geometry = roi;
+  
+  
+  Export.image.toAsset({
+    image: s2, 
+    description: 'img_colombia', 
+    //region: geometry,
+    scale: 10,
+    maxPixels: 600000000000
+    })
+});
+
