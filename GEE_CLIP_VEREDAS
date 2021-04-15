@@ -1,0 +1,17 @@
+
+print("Start")
+var image = ee.Image("users/fabioalexandercastro/img_colombia").clip(table)
+Map.addLayer(image, {},"imagen")
+Map.addLayer(table, {},"table")
+Map.centerObject(image)
+
+Export.image.toDrive({
+  image: image, 
+  description: "cmp_zona_urbana",
+  region: table, 
+  scale: 10, 
+  crs: "EPSG:4326",
+  maxPixels: 10000000000000
+})
+
+print("Lo hizo")
