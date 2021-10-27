@@ -1,0 +1,31 @@
+---
+title: "Informe ambiental - Monterrey (Casanare)"
+author: "Agrosolidaria Monterrey - Casanare"
+date: "10/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(pacman)
+pacman::p_load(raster, rgdal, rgeos, stringr, sf, tidyverse, fs, ggspatial, colorspace)
+```
+
+### Bosques 
+
+En la presente sección se evalúa el estado de la cobertura boscosa de Monterrey - Casanare, esto a partir de información satelital proveniente de Landsat y procesado por la Universidad de Maryland (Estados Unidos), el análisis conlleva el conteo del área boscosa inicial para el año 2000 y temporalmente se visualiza y calcula cómo se ha venido perdiendo / ganando esta cobertura boscosa hasta el año 2020. Esta metodología podría ser extrapolada a cualquier zona del mundo, entre tanto, se tiene disponibilidad para todos los países. 
+
+Fuente: Global Forest Change, disponible [aquí](https://earthenginepartners.appspot.com/science-2013-global-forest).  
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
